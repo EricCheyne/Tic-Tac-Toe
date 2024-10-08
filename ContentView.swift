@@ -16,8 +16,7 @@ enum DifficultyLevel {
 }
 
 struct ContentView: View {
-    
-    
+    // Game state variables
     @State private var board: [[String]] = [["", "", ""], ["", "", ""], ["", "", ""]]
     @State private var currentPlayer = "X"
     @State private var gameOver = false
@@ -37,22 +36,21 @@ struct ContentView: View {
             return Color.red // Fallback color
         }
     }()
-
+    
     var body: some View {
         ZStack {
             // Background
             LinearGradient(gradient: Gradient(colors: [.blue.opacity(0.4), .purple.opacity(0.4)]),
                            startPoint: .topLeading,
                            endPoint: .bottomTrailing)
-                .ignoresSafeArea()
-
+            .ignoresSafeArea()
+            
             VStack {
                 Text("Tic-Tac-Toe")
                     .font(.largeTitle)
-                    .foregroundColor(.white)
+                    .foregroundColor(accentColor)
                     .padding()
-
-                // Display Current Turn or Game Over Message
+                
                 if gameOver {
                     Text(winnerMessage)
                         .font(.title)
@@ -65,9 +63,8 @@ struct ContentView: View {
                         .font(.title2)
                         .foregroundColor(.white)
                         .padding()
-                        .transition(.opacity)
                 }
-
+                
                 // Difficulty Selector
                 Picker("Select Difficulty", selection: $difficulty) {
                     Text("Easy").tag(DifficultyLevel.easy)
@@ -76,7 +73,7 @@ struct ContentView: View {
                 }
                 .pickerStyle(SegmentedPickerStyle())
                 .padding()
-
+                
                 // Display Scores
                 HStack {
                     VStack {
@@ -87,7 +84,7 @@ struct ContentView: View {
                             .padding()
                     }
                     .foregroundColor(.blue)
-
+                    
                     VStack {
                         Text("AI (O)")
                             .font(.headline)
@@ -96,7 +93,7 @@ struct ContentView: View {
                             .padding()
                     }
                     .foregroundColor(.red)
-
+                    
                     VStack {
                         Text("Draws")
                             .font(.headline)
@@ -106,7 +103,7 @@ struct ContentView: View {
                     }
                     .foregroundColor(.gray)
                 }
-
+                
                 // Game Board
                 VStack(spacing: 10) {
                     ForEach(0..<3) { row in
@@ -116,10 +113,9 @@ struct ContentView: View {
                                     playerMove(row: row, col: col)
                                 }) {
                                     ZStack {
-                                        // Highlight winning cells
                                         if winningIndices.contains(where: { $0 == (row, col) }) {
                                             RoundedRectangle(cornerRadius: 15)
-                                                .fill(Color.green.opacity(0.6))
+                                                .fill(accentColor.opacity(0.6))
                                                 .frame(width: 100, height: 100)
                                                 .transition(.scale)
                                         } else {
@@ -130,6 +126,7 @@ struct ContentView: View {
                                         Text(board[row][col])
                                             .font(.system(size: 60, weight: .bold))
                                             .foregroundColor(board[row][col] == "X" ? .blue : .red)
+                                            .scaleEffect(gameOver ? 1.5 : 1.0)
                                     }
                                 }
                                 .animation(.easeInOut(duration: 0.3))
@@ -138,17 +135,17 @@ struct ContentView: View {
                     }
                 }
                 .padding()
-
+                
                 // Play Again and Reset Buttons
                 HStack(spacing: 20) {
                     Button(action: resetGame) {
                         Text("Play Again")
                             .padding()
-                            .background(Color.blue)
+                            .background(accentColor)
                             .foregroundColor(.white)
                             .cornerRadius(10)
                     }
-
+                    
                     Button(action: resetScores) {
                         Text("Reset Scores")
                             .padding()
@@ -165,15 +162,17 @@ struct ContentView: View {
             Alert(title: Text("Game Over"), message: Text(winnerMessage), dismissButton: .default(Text("OK"), action: resetGame))
         }
     }
-
+    
     // Player makes a move
     func playerMove(row: Int, col: Int) {
         if board[row][col].isEmpty && currentPlayer == "X" {
             board[row][col] = currentPlayer
+            playSound(named: "move") // Play sound for the player's move
             if checkForWin() {
                 playerScore += 1
                 winnerMessage = "Player X wins!"
                 gameOver = true
+                playSound(named: "win") // Play sound for winning
             } else if isDraw() {
                 drawCount += 1
                 winnerMessage = "It's a draw!"
@@ -184,7 +183,7 @@ struct ContentView: View {
             }
         }
     }
-
+    
     // AI makes a move
     func aiMove() {
         let bestMove: (Int, Int)
@@ -193,17 +192,19 @@ struct ContentView: View {
         case .easy:
             bestMove = randomMove()
         case .medium:
-            bestMove = limitedDepthMinimaxMove()
+            bestMove = minimaxMove()
         case .hard:
-            bestMove = fullMinimaxMove()
+            bestMove = limitedDepthMinimaxMove(depth: 4)
         }
-
+        
         board[bestMove.0][bestMove.1] = currentPlayer
-
+        playSound(named: "move") // Play sound for the AI's move
+        
         if checkForWin() {
             aiScore += 1
             winnerMessage = "AI wins!"
             gameOver = true
+            playSound(named: "win") // Play sound for winning
         } else if isDraw() {
             drawCount += 1
             winnerMessage = "It's a draw!"
@@ -212,83 +213,87 @@ struct ContentView: View {
             currentPlayer = "X" // Switch back to player
         }
     }
-
+    
     // Check for a winning pattern
     func checkForWin() -> Bool {
-        let winPatterns = [
-            [(0, 0), (0, 1), (0, 2)],
-            [(1, 0), (1, 1), (1, 2)],
-            [(2, 0), (2, 1), (2, 2)],
-            [(0, 0), (1, 0), (2, 0)],
-            [(0, 1), (1, 1), (2, 1)],
-            [(0, 2), (1, 2), (2, 2)],
-            [(0, 0), (1, 1), (2, 2)],
-            [(0, 2), (1, 1), (2, 0)]
+        let winningPatterns: [[(Int, Int)]] = [
+            [(0, 0), (0, 1), (0, 2)], // Row 1
+            [(1, 0), (1, 1), (1, 2)], // Row 2
+            [(2, 0), (2, 1), (2, 2)], // Row 3
+            [(0, 0), (1, 0), (2, 0)], // Column 1
+            [(0, 1), (1, 1), (2, 1)], // Column 2
+            [(0, 2), (1, 2), (2, 2)], // Column 3
+            [(0, 0), (1, 1), (2, 2)], // Diagonal
+            [(0, 2), (1, 1), (2, 0)], // Diagonal
         ]
-
-        for pattern in winPatterns {
-            let p1 = board[pattern[0].0][pattern[0].1]
-            let p2 = board[pattern[1].0][pattern[1].1]
-            let p3 = board[pattern[2].0][pattern[2].1]
-
-            if !p1.isEmpty && p1 == p2 && p2 == p3 {
+        
+        for pattern in winningPatterns {
+            let first = board[pattern[0].0][pattern[0].1]
+            if first != "" && pattern.allSatisfy({ board[$0.0][$0.1] == first }) {
                 winningIndices = pattern
                 return true
             }
         }
-
         return false
     }
-
-    // Check if the game is a draw
+    
+    // Check for a draw
     func isDraw() -> Bool {
-        return !board.flatMap { $0 }.contains("")
+        return board.flatMap { $0 }.allSatisfy { !$0.isEmpty }
     }
-
-    // Generate random move for Easy difficulty
+    
+    // Reset the game board
+    func resetGame() {
+        board = [["", "", ""], ["", "", ""], ["", "", ""]]
+        currentPlayer = "X"
+        gameOver = false
+        winnerMessage = ""
+        winningIndices = []
+    }
+    
+    // Reset the scores
+    func resetScores() {
+        playerScore = 0
+        aiScore = 0
+        drawCount = 0
+        resetGame()
+    }
+    
+    // Play sound effects
+    func playSound(named soundName: String) {
+        guard let url = Bundle.main.url(forResource: soundName, withExtension: "wav") else { return }
+        do {
+            audioPlayer = try AVAudioPlayer(contentsOf: url)
+            audioPlayer?.play()
+        } catch {
+            print("Error loading sound: \(error)")
+        }
+    }
+    
+    // Random AI move
     func randomMove() -> (Int, Int) {
-        var availableMoves: [(Int, Int)] = []
+        var emptyCells: [(Int, Int)] = []
         for row in 0..<3 {
             for col in 0..<3 {
                 if board[row][col].isEmpty {
-                    availableMoves.append((row, col))
+                    emptyCells.append((row, col))
                 }
             }
         }
-        return availableMoves.randomElement()!
+        return emptyCells.randomElement() ?? (0, 0)
     }
-
-    func limitedDepthMinimaxMove() -> (Int, Int) {
-        // Placeholder logic for a simple minimax with limited depth
-        return randomMove()
-    }
-
-    func fullMinimaxMove() -> (Int, Int) {
-        var bestScore = Int.min
-        var bestMove: (Int, Int) = (0, 0)
-
-        for row in 0..<3 {
-            for col in 0..<3 {
-                if board[row][col].isEmpty {
-                    board[row][col] = currentPlayer // AI's move
-                    let score = minimax(depth: 0, isMaximizing: false)
-                    board[row][col] = "" // Undo move
-
-                    if score > bestScore {
-                        bestScore = score
-                        bestMove = (row, col)
-                    }
-                }
-            }
-        }
-        return bestMove
-    }
-
-    func minimax(depth: Int, isMaximizing: Bool) -> Int {
+    
+    // Minimax function to evaluate the board state
+    private func minimax(depth: Int, isMaximizing: Bool) -> Int {
         if checkForWin() {
-            return isMaximizing ? -1 : 1 // Win for AI or Player
-        } else if isDraw() {
+            return isMaximizing ? -1 : 1 // Adjust scores for winning
+        }
+        if isDraw() {
             return 0 // Draw
+        }
+
+        if depth == 0 {
+            return 0 // No more depth to explore
         }
 
         if isMaximizing {
@@ -296,8 +301,8 @@ struct ContentView: View {
             for row in 0..<3 {
                 for col in 0..<3 {
                     if board[row][col].isEmpty {
-                        board[row][col] = currentPlayer // AI's move
-                        let score = minimax(depth: depth + 1, isMaximizing: false)
+                        board[row][col] = "O" // AI's turn
+                        let score = minimax(depth: depth - 1, isMaximizing: false)
                         board[row][col] = "" // Undo move
                         bestScore = max(score, bestScore)
                     }
@@ -309,8 +314,8 @@ struct ContentView: View {
             for row in 0..<3 {
                 for col in 0..<3 {
                     if board[row][col].isEmpty {
-                        board[row][col] = "X" // Player's move
-                        let score = minimax(depth: depth + 1, isMaximizing: true)
+                        board[row][col] = "X" // Player's turn
+                        let score = minimax(depth: depth - 1, isMaximizing: true)
                         board[row][col] = "" // Undo move
                         bestScore = min(score, bestScore)
                     }
@@ -319,22 +324,60 @@ struct ContentView: View {
             return bestScore
         }
     }
-
-    // Reset the game board
-    func resetGame() {
-        board = [["", "", ""], ["", "", ""], ["", "", ""]]
-        currentPlayer = "X"
-        gameOver = false
-        winnerMessage = ""
-        winningIndices = []
+    
+    // Minimax AI move
+    func minimaxMove() -> (Int, Int) {
+        var bestScore = Int.min
+        var bestMove = (0, 0)
+        
+        // Loop through the board to find the best move
+        for row in 0..<3 {
+            for col in 0..<3 {
+                if board[row][col].isEmpty {
+                    // Make the move
+                    board[row][col] = "O" // AI's move
+                    
+                    // Calculate the score using minimax
+                    let score = minimax(depth: 0, isMaximizing: false)
+                    
+                    // Undo the move
+                    board[row][col] = ""
+                    
+                    if score > bestScore {
+                        bestScore = score
+                        bestMove = (row, col)
+                    }
+                }
+            }
+        }
+        return bestMove
     }
-
-    // Reset the scores
-    func resetScores() {
-        playerScore = 0
-        aiScore = 0
-        drawCount = 0
-        resetGame()
+    
+    // Limited depth minimax AI move
+    func limitedDepthMinimaxMove(depth: Int) -> (Int, Int) {
+        var bestScore = Int.min
+        var bestMove = (0, 0)
+        
+        // Iterate through all possible moves
+        for row in 0..<3 {
+            for col in 0..<3 {
+                if board[row][col].isEmpty { // Check if the cell is empty
+                    board[row][col] = "O" // Assume AI is "O"
+                    
+                    // Get the score for this move
+                    let score = minimax(depth: depth, isMaximizing: false) // Ensure this call is correct
+                    
+                    board[row][col] = "" // Undo the move
+                    
+                    if score > bestScore {
+                        bestScore = score
+                        bestMove = (row, col)
+                    }
+                }
+            }
+        }
+        
+        return bestMove
     }
 }
 
@@ -360,3 +403,4 @@ extension Color {
         self.init(red: r, green: g, blue: b)
     }
 }
+
