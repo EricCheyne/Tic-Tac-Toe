@@ -17,7 +17,7 @@ enum DifficultyLevel {
 
 struct ContentView: View {
     
-    // Game state variables
+    
     @State private var board: [[String]] = [["", "", ""], ["", "", ""], ["", "", ""]]
     @State private var currentPlayer = "X"
     @State private var gameOver = false
