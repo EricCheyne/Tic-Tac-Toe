@@ -58,6 +58,7 @@ struct ContentView: View {
                         .foregroundColor(.yellow)
                         .padding()
                         .transition(.scale)
+                        .animation(.easeInOut(duration: 1.5), value: gameOver)
                 } else {
                     Text("Current Player: \(currentPlayer)")
                         .font(.title2)
@@ -110,7 +111,9 @@ struct ContentView: View {
                         HStack(spacing: 10) {
                             ForEach(0..<3) { col in
                                 Button(action: {
-                                    playerMove(row: row, col: col)
+                                    withAnimation(.easeInOut(duration: 0.7)) {
+                                        playerMove(row: row, col: col)
+                                    }
                                 }) {
                                     ZStack {
                                         if winningIndices.contains(where: { $0 == (row, col) }) {
@@ -129,7 +132,6 @@ struct ContentView: View {
                                             .scaleEffect(gameOver ? 1.5 : 1.0)
                                     }
                                 }
-                                .animation(.easeInOut(duration: 0.3))
                             }
                         }
                     }
@@ -138,22 +140,28 @@ struct ContentView: View {
                 
                 // Play Again and Reset Buttons
                 HStack(spacing: 20) {
-                    Button(action: resetGame) {
-                        Text("Play Again")
-                            .padding()
-                            .background(accentColor)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
-                    }
-                    
-                    Button(action: resetScores) {
-                        Text("Reset Scores")
-                            .padding()
-                            .background(Color.red)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
-                    }
-                }
+                                    Button(action: {
+                                        playSound(named: "move")
+                                        resetGame()
+                                    }) {
+                                        Text("Play Again")
+                                            .padding()
+                                            .background(accentColor)
+                                            .foregroundColor(.white)
+                                            .cornerRadius(10)
+                                    }
+                                    
+                                    Button(action: {
+                                        playSound(named: "move")
+                                        resetScores()
+                                    }) {
+                                        Text("Reset Scores")
+                                            .padding()
+                                            .background(Color.red)
+                                            .foregroundColor(.white)
+                                            .cornerRadius(10)
+                                    }
+                                }
                 .padding(.top)
             }
             .padding()
@@ -177,6 +185,7 @@ struct ContentView: View {
                 drawCount += 1
                 winnerMessage = "It's a draw!"
                 gameOver = true
+                playSound(named: "draw") // Play sound for a draw
             } else {
                 currentPlayer = "O" // Switch to AI
                 aiMove() // AI makes a move
@@ -201,17 +210,18 @@ struct ContentView: View {
         playSound(named: "move") // Play sound for the AI's move
         
         if checkForWin() {
-            aiScore += 1
-            winnerMessage = "AI wins!"
-            gameOver = true
-            playSound(named: "win") // Play sound for winning
-        } else if isDraw() {
-            drawCount += 1
-            winnerMessage = "It's a draw!"
-            gameOver = true
-        } else {
-            currentPlayer = "X" // Switch back to player
-        }
+                    aiScore += 1
+                    winnerMessage = "AI wins!"
+                    gameOver = true
+                    playSound(named: "lose") // Play sound for losing
+                } else if isDraw() {
+                    drawCount += 1
+                    winnerMessage = "It's a draw!"
+                    gameOver = true
+                    playSound(named: "draw") // Play sound for a draw
+                } else {
+                    currentPlayer = "X" // Switch back to player
+                }
     }
     
     // Check for a winning pattern
@@ -263,6 +273,9 @@ struct ContentView: View {
     func playSound(named soundName: String) {
         guard let url = Bundle.main.url(forResource: soundName, withExtension: "wav") else { return }
         do {
+            if audioPlayer?.isPlaying == true {
+                audioPlayer?.stop() // Stop if already playing
+            }
             audioPlayer = try AVAudioPlayer(contentsOf: url)
             audioPlayer?.play()
         } catch {
